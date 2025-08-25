@@ -42,6 +42,7 @@ model Space {
     slug      String      @unique @regex('^[0-9a-zA-Z]{4,16}$')
     members   SpaceUser[]
     lists     List[]
+    tasks     Task[] // Added for Task relation
     
     // require login
     @@deny('all', auth() == null)
@@ -102,6 +103,7 @@ model User {
     image         String?     @url
     lists         List[]
     todos         Todo[]
+    tasks         Task[] // Added for Task relation
 
     // next-auth
     accounts      Account[]
@@ -153,7 +155,23 @@ model List extends BaseEntity {
 }
 
 /**
+ * Model for a reusable Task
+ * Tasks can be picked and reused in Todos to standardize items
+ */
+model Task extends BaseEntity {
+    title       String  @length(1, 100)
+    description String?
+    todos       Todo[]
+
+    // Only owner and space members can read
+    @@allow('read', owner == auth() || (space.members?[user == auth()]))
+    // Only owner can update/delete
+    @@allow('update,delete', owner == auth())
+}
+
+/**
  * Model for a single Todo
+ * Now references a Task instead of its own title/description
  */
 model Todo {
     id          String    @id @default(uuid())
@@ -163,7 +181,8 @@ model Todo {
     ownerId     String    @default(auth().id)
     list        List      @relation(fields: [listId], references: [id], onDelete: Cascade)
     listId      String
-    title       String    @length(1, 100)
+    task        Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+    taskId      String
     completedAt DateTime?
 
     // full access if the parent list is readable
